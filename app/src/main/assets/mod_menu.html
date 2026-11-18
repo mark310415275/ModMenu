@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Mod Menu</title>
+<style>
+  :root{
+    --bg:#14111f; --surface:#1d1930; --surface2:#262140; --line:#352f57;
+    --text:#ece9ff; --muted:#8f89b5; --accent:#7c5cff; --accent2:#00d4c8; --off:#3a3560;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:transparent;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text)}
+  /* фон только для демо в браузере; в APK (WebView) он прозрачный */
+  body.demo{background:linear-gradient(160deg,#2b3a55,#0f1626 60%,#1b1230)}
+
+  /* ---------- Круглая кнопка ---------- */
+  #fab{
+    position:fixed; left:16px; top:40%; width:58px; height:58px; border-radius:50%;
+    border:2px solid rgba(255,255,255,.18); z-index:20; padding:0; cursor:pointer;
+    background:radial-gradient(circle at 30% 25%,#9a80ff,var(--accent) 55%,#4b2fd1);
+    box-shadow:0 6px 22px rgba(124,92,255,.55),0 0 0 0 rgba(124,92,255,.5);
+    display:grid; place-items:center; touch-action:none;
+    transition:transform .15s, box-shadow .25s, background .25s;
+  }
+  #fab svg{width:28px;height:28px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;
+    transition:transform .35s}
+  #fab.open{background:radial-gradient(circle at 30% 25%,#41f0e4,var(--accent2) 55%,#008f88);
+    box-shadow:0 6px 22px rgba(0,212,200,.5)}
+  #fab.open svg{transform:rotate(90deg)}
+  #fab.drag{transform:scale(1.08);opacity:.9}
+
+  /* ---------- Панель ---------- */
+  #panel{
+    position:fixed; z-index:10; width:min(330px,calc(100vw - 24px)); max-height:min(78vh,520px);
+    display:flex; flex-direction:column; overflow:hidden;
+    background:rgba(20,17,31,.94); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--line); border-radius:20px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55);
+    opacity:0; transform:scale(.92); transform-origin:var(--ox,0) var(--oy,0);
+    pointer-events:none; transition:opacity .18s, transform .18s;
+  }
+  #panel.show{opacity:1;transform:scale(1);pointer-events:auto}
+
+  header{display:flex;align-items:center;gap:10px;padding:14px 16px 10px}
+  .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff}
+  header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.2px}
+  header small{display:block;color:var(--muted);font-size:11px;margin-top:1px}
+  .status{margin-left:auto;font-size:11px;padding:4px 9px;border-radius:99px;background:var(--surface2);color:var(--accent2)}
+
+  nav{display:flex;gap:6px;padding:4px 12px 10px}
+  nav button{flex:1;border:0;background:transparent;color:var(--muted);font:600 13px inherit;font-family:inherit;
+    padding:8px 4px;border-radius:10px;cursor:pointer;transition:.15s}
+  nav button.active{background:var(--surface2);color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+
+  .body{overflow-y:auto;padding:2px 12px 14px;-webkit-overflow-scrolling:touch}
+  .tab{display:none;flex-direction:column;gap:8px}
+  .tab.active{display:flex}
+
+  .row{display:flex;align-items:center;gap:12px;padding:11px 12px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px}
+  .row .t{flex:1;min-width:0}
+  .row .t b{display:block;font-size:14px;font-weight:600}
+  .row .t span{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+
+  /* переключатель */
+  .sw{position:relative;width:46px;height:26px;flex:none}
+  .sw input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}
+  .sw i{position:absolute;inset:0;border-radius:99px;background:var(--off);transition:.2s}
+  .sw i::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+    background:#fff;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.4)}
+  .sw input:checked + i{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .sw input:checked + i::after{transform:translateX(20px)}
+
+  /* слайдер */
+  .slider{flex-direction:column;align-items:stretch;gap:9px}
+  .slider .top{display:flex;justify-content:space-between;font-size:14px;font-weight:600}
+  .slider .top em{font-style:normal;color:var(--accent2);font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;
+    background:linear-gradient(90deg,var(--accent) var(--p,50%),var(--off) var(--p,50%));outline:none;margin:4px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent);box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
+
+  .btn{border:0;border-radius:12px;padding:12px;font:700 14px inherit;font-family:inherit;color:#fff;cursor:pointer;
+    background:linear-gradient(90deg,var(--accent),#5a8bff);transition:transform .1s}
+  .btn:active{transform:scale(.97)}
+  .btn.ghost{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
+
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:7px 12px;border-radius:99px;background:var(--surface2);border:1px solid var(--line);
+    font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);background:var(--surface2);
+    border:1px solid var(--line);padding:9px 16px;border-radius:99px;font-size:13px;opacity:0;
+    transition:.25s;z-index:30;pointer-events:none}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  body.android #fab{left:8px!important;top:8px!important}
+</style>
+</head>
+<body class="demo">
+
+<button id="fab" aria-label="Открыть меню">
+  <svg viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg>
+</button>
+
+<section id="panel" aria-hidden="true">
+  <header>
+    <div class="logo">M</div>
+    <div><h1>Mod Menu</h1><small>v1.0 · перетащи кнопку куда удобно</small></div>
+    <div class="status" id="status">0 вкл</div>
+  </header>
+
+  <nav>
+    <button class="active" data-tab="main">Основное</button>
+    <button data-tab="visual">Вид</button>
+    <button data-tab="settings">Настройки</button>
+  </nav>
+
+  <div class="body">
+    <div class="tab active" id="main">
+      <label class="row"><div class="t"><b>Функция 1</b><span>Описание функции</span></div>
+        <div class="sw"><input type="checkbox" data-key="feature1"><i></i></div></label>
+      <label class="row"><div class="t"><b>Функция 2</b><span>Описание функции</span></div>
+        <div class="sw"><input type="checkbox" data-key="feature2"><i></i></div></label>
+      <label class="row"><div class="t"><b>Функция 3</b><span>Описание функции</span></div>
+        <div class="sw"><input type="checkbox" data-key="feature3"><i></i></div></label>
+      <div class="row slider">
+        <div class="top"><span>Значение</span><em>50</em></div>
+        <input type="range" min="0" max="100" value="50" data-key="value">
+      </div>
+      <button class="btn" data-action="apply">Применить</button>
+    </div>
+
+    <div class="tab" id="visual">
+      <label class="row"><div class="t"><b>Подсказки</b><span>Показывать пояснения</span></div>
+        <div class="sw"><input type="checkbox" data-key="hints" checked><i></i></div></label>
+      <div class="row slider">
+        <div class="top"><span>Прозрачность меню</span><em>94</em></div>
+        <input type="range" min="40" max="100" value="94" data-key="opacity">
+      </div>
+      <div class="row slider">
+        <div class="top"><span>Размер кнопки</span><em>58</em></div>
+        <input type="range" min="40" max="90" value="58" data-key="fabsize">
+      </div>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:10px">
+        <b style="font-size:14px">Цвет акцента</b>
+        <div class="chips" id="colors">
+          <span class="chip on" data-c="#7c5cff">Фиолет</span>
+          <span class="chip" data-c="#ff4d8d">Розовый</span>
+          <span class="chip" data-c="#2f9bff">Синий</span>
+          <span class="chip" data-c="#22c55e">Зелёный</span>
+          <span class="chip" data-c="#ff8a1f">Оранж</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab" id="settings">
+      <label class="row"><div class="t"><b>Запоминать позицию</b><span>Кнопка вернётся на место</span></div>
+        <div class="sw"><input type="checkbox" data-key="remember" checked><i></i></div></label>
+      <label class="row"><div class="t"><b>Прилипать к краю</b><span>Кнопка сама сдвинется к краю</span></div>
+        <div class="sw"><input type="checkbox" data-key="snap" checked><i></i></div></label>
+      <label class="row"><div class="t"><b>Вибрация</b><span>Отклик при нажатии</span></div>
+        <div class="sw"><input type="checkbox" data-key="vibe" checked><i></i></div></label>
+      <button class="btn ghost" data-action="reset">Сбросить всё</button>
+      <button class="btn ghost" data-action="close">Свернуть меню</button>
+    </div>
+  </div>
+</section>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  const $  = (s,r=document)=>r.querySelector(s);
+  const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+  const fab = $('#fab'), panel = $('#panel'), toastEl = $('#toast');
+
+  // В APK (WebView) фон прозрачный, демо-фон только в браузере
+  const IS_ANDROID = !!window.Android;
+  if (IS_ANDROID){
+    document.body.classList.remove('demo'); document.body.classList.add('android');
+    panel.style.width = Math.min(330,(screen.width||360)-16)+'px';
+    panel.style.maxHeight = Math.min(520,(screen.height||800)*0.7)+'px';
+  }
+
+  const state = {};
+  const store = {
+    get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
+    set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+  };
+
+  // Мост к Android: в Java/Kotlin добавь addJavascriptInterface(obj, "Android")
+  // и методы onToggle(String key, boolean v), onValue(String key, int v), onAction(String name),
+  // onSize(w,h,fab,open), showToast(msg)
+  function native(method, ...args){
+    try{ if (window.Android && typeof window.Android[method]==='function') window.Android[method](...args); }catch(e){}
+  }
+  function vibrate(){ if (state.vibe!==false && navigator.vibrate) navigator.vibrate(12); }
+  function toast(msg){
+    if (IS_ANDROID){ native('showToast', msg); return; }
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    clearTimeout(toast.t); toast.t = setTimeout(()=>toastEl.classList.remove('show'),1400);
+  }
+
+  /* ---------- Открыть / закрыть ---------- */
+  let open = false;
+  function place(){
+    if (IS_ANDROID){
+      panel.style.left='8px'; panel.style.top=(fab.offsetWidth+16)+'px';
+      panel.style.setProperty('--ox','30px'); panel.style.setProperty('--oy','-20px');
+      return;
+    }
+    const w = panel.offsetWidth, h = panel.offsetHeight, vw = innerWidth, vh = innerHeight;
+    const r = fab.getBoundingClientRect();
+    let x = r.left + r.width/2 > vw/2 ? r.right - w : r.left;
+    let y = r.top + r.height/2 > vh/2 ? r.top - h - 10 : r.bottom + 10;
+    x = Math.max(12, Math.min(vw - w - 12, x));
+    y = Math.max(12, Math.min(vh - h - 12, y));
+    panel.style.left = x+'px'; panel.style.top = y+'px';
+    panel.style.setProperty('--ox', (r.left + r.width/2 - x)+'px');
+    panel.style.setProperty('--oy', (r.top + r.height/2 - y)+'px');
+  }
+  function setOpen(v){
+    open = v;
+    if (v) place();
+    panel.classList.toggle('show', v);
+    fab.classList.toggle('open', v);
+    panel.setAttribute('aria-hidden', String(!v));
+    updateSize();
+    vibrate();
+  }
+  window.toggleMenu = ()=>setOpen(!open);
+  function updateSize(){
+    if (!IS_ANDROID) return;
+    clearTimeout(updateSize.t);
+    updateSize.t = setTimeout(()=>{
+      const f = fab.offsetWidth + 16;
+      const w = open ? Math.max(f, panel.offsetWidth + 16) : f;
+      const h = open ? f + panel.offsetHeight + 8 : f;
+      native('onSize', w, h, f, open);
+    }, open ? 30 : 220);
+  }
+
+  /* ---------- Перетаскивание кнопки ---------- */
+  let sx, sy, ox, oy, moved = false, dragging = false;
+  fab.addEventListener('pointerdown', e=>{
+    if (IS_ANDROID) return;
+    dragging = true; moved = false; fab.setPointerCapture(e.pointerId);
+    const r = fab.getBoundingClientRect(); sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+  });
+  fab.addEventListener('pointermove', e=>{
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.hypot(dx,dy) < 6) return;
+    moved = true; fab.classList.add('drag');
+    const s = fab.offsetWidth;
+    const x = Math.max(0, Math.min(innerWidth - s, ox + dx));
+    const y = Math.max(0, Math.min(innerHeight - s, oy + dy));
+    fab.style.left = x+'px'; fab.style.top = y+'px';
+    if (open) place();
+  });
+  fab.addEventListener('pointerup', e=>{
+    if (IS_ANDROID) return;
+    dragging = false; fab.classList.remove('drag');
+    if (!moved){ setOpen(!open); return; }
+    if (state.snap !== false){
+      const s = fab.offsetWidth, r = fab.getBoundingClientRect();
+      const toRight = r.left + s/2 > innerWidth/2;
+      fab.style.transition = 'left .25s cubic-bezier(.3,1.4,.5,1)';
+      fab.style.left = (toRight ? innerWidth - s - 8 : 8) + 'px';
+      setTimeout(()=>{ fab.style.transition=''; if(open) place(); },260);
+    }
+    if (state.remember !== false) store.set('mm_pos',{x:fab.style.left,y:fab.style.top});
+  });
+  fab.addEventListener('pointercancel', ()=>{ dragging=false; fab.classList.remove('drag'); });
+
+  const pos = store.get('mm_pos');
+  if (pos && !IS_ANDROID){ fab.style.left = pos.x; fab.style.top = pos.y; }
+
+  /* ---------- Вкладки ---------- */
+  $$('nav button').forEach(b=>b.addEventListener('click',()=>{
+    $$('nav button').forEach(x=>x.classList.toggle('active',x===b));
+    $$('.tab').forEach(t=>t.classList.toggle('active',t.id===b.dataset.tab));
+    vibrate(); updateSize();
+  }));
+
+  /* ---------- Переключатели ---------- */
+  function updateStatus(){
+    const n = $$('#main input[type=checkbox]').filter(i=>i.checked).length;
+    $('#status').textContent = n + ' вкл';
+  }
+  $$('input[type=checkbox]').forEach(i=>{
+    const k = i.dataset.key; state[k] = store.get('mm_'+k, i.checked); i.checked = state[k];
+    i.addEventListener('change',()=>{
+      state[k] = i.checked; store.set('mm_'+k, i.checked);
+      native('onToggle', k, i.checked); updateStatus(); vibrate();
+    });
+  });
+  updateStatus();
+
+  /* ---------- Слайдеры ---------- */
+  function paint(r){ r.style.setProperty('--p', ((r.value-r.min)/(r.max-r.min)*100)+'%'); }
+  $$('input[type=range]').forEach(r=>{
+    const k = r.dataset.key, em = r.closest('.row').querySelector('em');
+    r.value = store.get('mm_'+k, r.value); em.textContent = r.value; paint(r); applyRange(k, r.value);
+    r.addEventListener('input',()=>{
+      em.textContent = r.value; paint(r); store.set('mm_'+k, +r.value);
+      applyRange(k, +r.value); native('onValue', k, +r.value);
+    });
+  });
+  function applyRange(k,v){
+    if (k==='opacity') panel.style.background = `rgba(20,17,31,${v/100})`;
+    if (k==='fabsize'){ fab.style.width = fab.style.height = v+'px'; if(open) place(); updateSize(); }
+  }
+
+  /* ---------- Цвет акцента ---------- */
+  function setAccent(c){
+    document.documentElement.style.setProperty('--accent', c);
+    fab.style.background = ''; // вернуть градиент из CSS
+    $$('#colors .chip').forEach(x=>x.classList.toggle('on', x.dataset.c===c));
+  }
+  $$('#colors .chip').forEach(c=>c.addEventListener('click',()=>{
+    setAccent(c.dataset.c); store.set('mm_accent', c.dataset.c); vibrate();
+  }));
+  setAccent(store.get('mm_accent','#7c5cff'));
+
+  /* ---------- Кнопки ---------- */
+  $$('[data-action]').forEach(b=>b.addEventListener('click',()=>{
+    const a = b.dataset.action; native('onAction', a); vibrate();
+    if (a==='apply') toast('Применено');
+    if (a==='close') setOpen(false);
+    if (a==='reset'){ try{ localStorage.clear(); }catch(e){} toast('Сброшено'); setTimeout(()=>location.reload(),600); }
+  }));
+
+  addEventListener('resize', ()=>{ if(open) place(); });
+  updateSize();
+})();
+</script>
+</body>
+</html>
